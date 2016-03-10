@@ -562,9 +562,9 @@ fn cstruct_to_rs(ctx: &mut GenCtx, name: String,
     );
 
     let id = rust_type_id(ctx, name.clone());
-    let mut attrs = vec!(mk_repr_attr(ctx, layout), mk_deriving_copy_attr(ctx, false));
+    let mut attrs = vec!(mk_repr_attr(ctx, layout), mk_deriving_attrs(ctx, &["Copy"]));
     if can_derive_debug {
-        attrs.push(mk_deriving_debug_attr(ctx));
+        attrs.push(mk_deriving_attrs(ctx, &["Debug"]));
     }
     let struct_def = P(ast::Item { ident: ctx.ext_cx.ident_of(&id[..]),
         attrs: attrs,
@@ -650,7 +650,7 @@ fn cunion_to_rs(ctx: &mut GenCtx, name: String, layout: Layout, members: Vec<Com
         empty_generics()
     );
     let union_id = rust_type_id(ctx, name.clone());
-    let union_attrs = vec!(mk_repr_attr(ctx, layout), mk_deriving_copy_attr(ctx, false));
+    let union_attrs = vec!(mk_repr_attr(ctx, layout), mk_deriving_attrs(ctx, &["Copy"]));
     let union_def = mk_item(ctx, union_id, def, ast::Visibility::Public, union_attrs);
 
     let union_impl = ast::ItemKind::Impl(
@@ -823,7 +823,7 @@ fn cenum_to_rs(ctx: &mut GenCtx,
 
     items.push(P(ast::Item {
         ident: enum_name,
-        attrs: vec![mk_deriving_copy_attr(ctx, true), repr_attr],
+        attrs: vec![mk_deriving_attrs(ctx, &["Copy", "Clone"]), repr_attr],
         id: ast::DUMMY_NODE_ID,
         node: ast::ItemKind::Enum(ast::EnumDef { variants: variants }, empty_generics()),
         vis: ast::Visibility::Public,
@@ -985,26 +985,10 @@ fn mk_repr_attr(ctx: &mut GenCtx, layout: Layout) -> ast::Attribute {
     })
 }
 
-fn mk_deriving_copy_attr(ctx: &mut GenCtx, clone: bool) -> ast::Attribute {
-    let mut words = vec!();
-    if clone {
-        words.push(ctx.ext_cx.meta_word(ctx.span, InternedString::new("Clone")));
-    }
-    words.push(ctx.ext_cx.meta_word(ctx.span, InternedString::new("Copy")));
-
-    let attr_val = ctx.ext_cx.meta_list(ctx.span, InternedString::new("derive"), words);
-
-    respan(ctx.span, ast::Attribute_ {
-        id: mk_attr_id(),
-        style: ast::AttrStyle::Outer,
-        value: attr_val,
-        is_sugared_doc: false
-    })
-}
-
-fn mk_deriving_debug_attr(ctx: &mut GenCtx) -> ast::Attribute {
-    let words = vec!(ctx.ext_cx.meta_word(ctx.span, InternedString::new("Debug")));
-
+fn mk_deriving_attrs(ctx: &mut GenCtx, attrs: &[&str]) -> ast::Attribute {
+    let words = attrs.iter()
+                     .map(|attr| ctx.ext_cx.meta_word(ctx.span, InternedString::new(attr)))
+                     .collect();
     let attr_val = ctx.ext_cx.meta_list(ctx.span, InternedString::new("derive"), words);
 
     respan(ctx.span, ast::Attribute_ {
