@@ -12,7 +12,7 @@ use std::ffi::CString;
 use clangll::*;
 
 // Cursor
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct Cursor {
     x: CXCursor
 }

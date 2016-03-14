@@ -316,7 +316,7 @@ pub const CXCursor_ModuleImportDecl: c_uint = 600;
 pub const CXCursor_FirstExtraDecl: c_uint = 600;
 pub const CXCursor_LastExtraDecl: c_uint = 600;
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct CXCursor {
     pub kind: Enum_CXCursorKind,
     pub xdata: c_int,
