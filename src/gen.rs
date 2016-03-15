@@ -61,12 +61,12 @@ fn rust_type_id(ctx: &mut GenCtx, name: &str) -> String {
     }
 }
 
-fn unnamed_name(ctx: &mut GenCtx, name: String) -> String {
+fn unnamed_name(ctx: &mut GenCtx, name: &str) -> String {
     if name.is_empty() {
         ctx.unnamed_ty += 1;
         format!("Unnamed{}", ctx.unnamed_ty)
     } else {
-        name
+        name.into()
     }
 }
 
@@ -168,7 +168,7 @@ pub fn gen_mod(
             GCompDecl(ci) => {
                 {
                     let mut c = ci.borrow_mut();
-                    c.name = unnamed_name(&mut ctx, c.name.clone());
+                    c.name = unnamed_name(&mut ctx, &c.name);
                 }
                 let c = ci.borrow().clone();
                 defs.push(opaque_to_rs(&mut ctx, comp_name(c.kind, &c.name)));
@@ -176,7 +176,7 @@ pub fn gen_mod(
             GComp(ci) => {
                 {
                     let mut c = ci.borrow_mut();
-                    c.name = unnamed_name(&mut ctx, c.name.clone());
+                    c.name = unnamed_name(&mut ctx, &c.name);
                 }
                 let c = ci.borrow().clone();
                 defs.extend(comp_to_rs(&mut ctx, c.kind, comp_name(c.kind, &c.name),
@@ -186,7 +186,7 @@ pub fn gen_mod(
             GEnumDecl(ei) => {
                 {
                     let mut e = ei.borrow_mut();
-                    e.name = unnamed_name(&mut ctx, e.name.clone());
+                    e.name = unnamed_name(&mut ctx, &e.name);
                 }
                 let e = ei.borrow().clone();
                 defs.push(opaque_to_rs(&mut ctx, enum_name(&e.name)));
@@ -194,7 +194,7 @@ pub fn gen_mod(
             GEnum(ei) => {
                 {
                     let mut e = ei.borrow_mut();
-                    e.name = unnamed_name(&mut ctx, e.name.clone());
+                    e.name = unnamed_name(&mut ctx, &e.name);
                 }
                 let e = ei.borrow();
                 defs.extend(cenum_to_rs(
@@ -1203,12 +1203,12 @@ fn cty_to_rs(ctx: &mut GenCtx, ty: &Type) -> ast::Ty {
         },
         TComp(ref ci) => {
             let mut c = ci.borrow_mut();
-            c.name = unnamed_name(ctx, c.name.clone());
+            c.name = unnamed_name(ctx, &c.name);
             mk_ty(ctx, false, vec!(comp_name(c.kind, &c.name)))
         },
         TEnum(ref ei) => {
             let mut e = ei.borrow_mut();
-            e.name = unnamed_name(ctx, e.name.clone());
+            e.name = unnamed_name(ctx, &e.name);
             mk_ty(ctx, false, vec!(enum_name(&e.name)))
         }
     }
