@@ -245,7 +245,7 @@ pub fn gen_mod(
         }
     }
 
-    gs = remove_redundant_decl(gs);
+    gs = remove_redundant_decl(&gs);
     let mut defs = extract_definitions(&mut ctx, &options, &gs);
 
     let vars: Vec<_> = vs.into_iter().map(|v| {
@@ -331,25 +331,20 @@ fn mk_extern(ctx: &mut GenCtx, links: &[(String, LinkType)],
     })
 }
 
-fn remove_redundant_decl(gs: Vec<Global>) -> Vec<Global> {
+fn remove_redundant_decl(gs: &[Global]) -> Vec<Global> {
     fn check_decl(a: &Global, ty: &Type) -> bool {
-        match *a {
-          GComp(ref ci1) => match *ty {
-              TComp(ref ci2) => {
-                  ref_eq(ci1, ci2) && ci1.borrow().name.is_empty()
-              },
-              _ => false
+        match (a, ty) {
+          (&GComp(ref ci1), &TComp(ref ci2)) => {
+              ref_eq(ci1, ci2) && ci1.borrow().name.is_empty()
           },
-          GEnum(ref ei1) => match *ty {
-              TEnum(ref ei2) => {
-                  ref_eq(ei1, ei2) && ei1.borrow().name.is_empty()
-              },
-              _ => false
+          (&GEnum(ref ei1), &TEnum(ref ei2)) => {
+              ref_eq(ei1, ei2) && ei1.borrow().name.is_empty()
           },
           _ => false
         }
     }
 
+    // TODO: replace by a Set when Type is Hash and Eq.
     let typedefs: Vec<Type> = gs.iter().filter_map(|g|
         match *g {
             GType(ref ti) => Some(ti.borrow().ty.clone()),
@@ -357,9 +352,9 @@ fn remove_redundant_decl(gs: Vec<Global>) -> Vec<Global> {
         }
     ).collect();
 
-    gs.into_iter().filter(|g|
-        !typedefs.iter().any(|t| check_decl(g, t))
-    ).collect()
+    gs.iter().filter(|g|
+        typedefs.iter().all(|t| !check_decl(g, t))
+    ).cloned().collect()
 }
 
 fn tag_dup_decl(gs: Vec<Global>) -> Vec<Global> {
