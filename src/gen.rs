@@ -248,7 +248,7 @@ pub fn gen_mod(
     gs = remove_redundant_decl(gs);
     let mut defs = extract_definitions(&mut ctx, &options, &gs);
 
-    let vars = vs.into_iter().map(|v| {
+    let vars: Vec<_> = vs.into_iter().map(|v| {
         match v {
             GVar(vi) => {
                 let v = vi.borrow();
@@ -260,13 +260,13 @@ pub fn gen_mod(
 
     let funcs = extract_functions(&mut ctx, &fs);
 
-    if !Vec::is_empty(&vars) {
-        defs.push(mk_extern(&mut ctx, &options.links, vars, abi::Abi::C));
+    if !vars.is_empty() {
+        defs.push(mk_extern(&mut ctx, &options.links, &vars, abi::Abi::C));
     }
 
-    for (abi, funcs) in funcs.into_iter() {
-        defs.push(mk_extern(&mut ctx, &options.links, funcs, abi));
-    }
+    defs.extend(funcs.iter().map(|(abi, funcs)| {
+        mk_extern(&mut ctx, &options.links, funcs, *abi)
+    }));
 
     //let attrs = vec!(mk_attr_list(&mut ctx, "allow", ["dead_code", "non_camel_case_types", "uppercase_variables"]));
 
@@ -274,7 +274,7 @@ pub fn gen_mod(
 }
 
 fn mk_extern(ctx: &mut GenCtx, links: &[(String, LinkType)],
-             foreign_items: Vec<ast::ForeignItem>,
+             foreign_items: &[ast::ForeignItem],
              abi: abi::Abi) -> P<ast::Item> {
     let attrs = if links.is_empty() {
         Vec::new()
@@ -314,8 +314,8 @@ fn mk_extern(ctx: &mut GenCtx, links: &[(String, LinkType)],
         }).collect()
     };
 
-    let mut items = Vec::new();
-    items.extend(foreign_items.into_iter());
+    let mut items: Vec<ast::ForeignItem> = Vec::new();
+    items.extend(foreign_items.iter().cloned());
     let ext = ast::ItemKind::ForeignMod(ast::ForeignMod {
         abi: abi,
         items: items
