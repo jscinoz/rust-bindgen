@@ -38,14 +38,13 @@ fn to_intern_str(ctx: &mut GenCtx, s: &str) -> parse::token::InternedString {
     id.name.as_str()
 }
 
-fn rust_id(ctx: &mut GenCtx, name: String) -> (String, bool) {
-    let token = parse::token::Ident(ctx.ext_cx.ident_of(&name[..]), parse::token::Plain);
-    if token.is_any_keyword() || "bool" == &name[..] {
-        let mut s = "_".to_owned();
-        s.push_str(&name[..]);
+fn rust_id(ctx: &mut GenCtx, name: &str) -> (String, bool) {
+    let token = parse::token::Ident(ctx.ext_cx.ident_of(name), parse::token::Plain);
+    if token.is_any_keyword() || "bool" == name {
+        let s = format!("_{}", name);
         (s, true)
     } else {
-        (name, false)
+        (name.into(), false)
     }
 }
 
@@ -67,7 +66,7 @@ fn rust_type_id(ctx: &mut GenCtx, name: String) -> String {
         s.push_str(&name[..]);
         s
     } else {
-        let (n, _) = rust_id(ctx, name);
+        let (n, _) = rust_id(ctx, &name);
         n
     }
 }
@@ -711,7 +710,7 @@ fn const_to_rs(ctx: &mut GenCtx, name: String, val: i64, val_ty: ast::Ty) -> P<a
         value
             );
 
-    let id = rust_id(ctx, name.clone()).0;
+    let id = rust_id(ctx, &name).0;
     P(ast::Item {
         ident: ctx.ext_cx.ident_of(&id[..]),
         attrs: Vec::new(),
@@ -883,7 +882,7 @@ fn gen_comp_methods(ctx: &mut GenCtx, data_field: &str, data_offset: usize,
         // TODO: Implement bitfield accessors
         if f.bitfields.is_some() { return None; }
 
-        let (f_name, _) = rust_id(ctx, f.name.clone());
+        let (f_name, _) = rust_id(ctx, &f.name);
         let ret_ty = P(cty_to_rs(ctx, &TPtr(Box::new(f.ty.clone()), false, Layout::zero())));
 
         // When the offset is zero, generate slightly prettier code.
@@ -1056,7 +1055,7 @@ fn mk_deriving_debug_attr(ctx: &mut GenCtx) -> ast::Attribute {
 fn cvar_to_rs(ctx: &mut GenCtx, name: String,
                                 ty: &Type,
                                 is_const: bool) -> ast::ForeignItem {
-    let (rust_name, was_mangled) = rust_id(ctx, name.clone());
+    let (rust_name, was_mangled) = rust_id(ctx, &name);
 
     let mut attrs = Vec::new();
     if was_mangled {
@@ -1093,7 +1092,7 @@ fn cfuncty_to_rs(ctx: &mut GenCtx,
             unnamed += 1;
             format!("arg{}", unnamed)
         } else {
-            rust_id(ctx, n.clone()).0
+            rust_id(ctx, &n).0
         };
 
         // From the C90 standard (http://c0x.coding-guidelines.com/6.7.5.3.html)
@@ -1138,7 +1137,7 @@ fn cfunc_to_rs(ctx: &mut GenCtx, name: String, rty: &Type,
         ast::Generics::default()
     );
 
-    let (rust_name, was_mangled) = rust_id(ctx, name.clone());
+    let (rust_name, was_mangled) = rust_id(ctx, &name);
 
     let mut attrs = Vec::new();
     if was_mangled {
