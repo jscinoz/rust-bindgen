@@ -12,7 +12,6 @@ use syntax::ext::build::AstBuilder;
 use syntax::ext::expand::ExpansionConfig;
 use syntax::ext::quote::rt::ToTokens;
 use syntax::feature_gate::Features;
-use syntax::owned_slice::OwnedSlice;
 use syntax::parse;
 use syntax::parse::token::InternedString;
 use syntax::attr::mk_attr_id;
@@ -481,7 +480,7 @@ fn cstruct_to_rs(ctx: &mut GenCtx,
             ast::ImplPolarity::Positive,
             ast::Generics::default(),
             None,
-            P(mk_ty(ctx, false, vec!(id))),
+            P(mk_ty(ctx, false, &[&id])),
             methods
         );
         items.push(
@@ -868,7 +867,7 @@ fn mk_blob_field(ctx: &GenCtx, name: &str, layout: Layout) -> Spanned<ast::Struc
         1 | _ => "u8",
     };
     let data_len = if ty_name == "u8" { layout.size } else { layout.size / layout.align };
-    let base_ty = mk_ty(ctx, false, vec!(ty_name.to_owned()));
+    let base_ty = mk_ty(ctx, false, &[ty_name]);
     let data_ty = P(mk_arrty(ctx, &base_ty, data_len));
     respan(ctx.span, ast::StructField_ {
         kind: ast::NamedField(
@@ -1016,15 +1015,12 @@ fn cfunc_to_rs(ctx: &mut GenCtx, name: String, rty: &Type,
 }
 
 fn cty_to_rs(ctx: &mut GenCtx, ty: &Type) -> ast::Ty {
-    let prefix = vec!["std".to_owned(), "os".to_owned(), "raw".to_owned()];
-    let raw = |fragment: &str| {
-        let mut path = prefix.clone();
-        path.push(fragment.to_owned());
-        path
-    };
+    fn raw(fragment: &'static str) -> Vec<&'static str> {
+        vec!["std", "os", "raw", fragment]
+    }
 
     match *ty {
-        TVoid => mk_ty(ctx, true, raw("c_void")),
+        TVoid => mk_ty(ctx, true, &raw("c_void")),
         TInt(i, ref layout) => match i {
             IBool => {
                 let ty_name = match layout.size {
@@ -1033,22 +1029,22 @@ fn cty_to_rs(ctx: &mut GenCtx, ty: &Type) -> ast::Ty {
                     2 => "u16",
                     1 | _ => "u8",
                 };
-                mk_ty(ctx, false, vec!(ty_name.to_owned()))
+                mk_ty(ctx, false, &[ty_name])
             },
-            ISChar => mk_ty(ctx, true, raw("c_char")),
-            IUChar => mk_ty(ctx, true, raw("c_uchar")),
-            IInt => mk_ty(ctx, true, raw("c_int")),
-            IUInt => mk_ty(ctx, true, raw("c_uint")),
-            IShort => mk_ty(ctx, true, raw("c_short")),
-            IUShort => mk_ty(ctx, true, raw("c_ushort")),
-            ILong => mk_ty(ctx, true, raw("c_long")),
-            IULong => mk_ty(ctx, true, raw("c_ulong")),
-            ILongLong => mk_ty(ctx, true, raw("c_longlong")),
-            IULongLong => mk_ty(ctx, true, raw("c_ulonglong"))
+            ISChar => mk_ty(ctx, true, &raw("c_char")),
+            IUChar => mk_ty(ctx, true, &raw("c_uchar")),
+            IInt => mk_ty(ctx, true, &raw("c_int")),
+            IUInt => mk_ty(ctx, true, &raw("c_uint")),
+            IShort => mk_ty(ctx, true, &raw("c_short")),
+            IUShort => mk_ty(ctx, true, &raw("c_ushort")),
+            ILong => mk_ty(ctx, true, &raw("c_long")),
+            IULong => mk_ty(ctx, true, &raw("c_ulong")),
+            ILongLong => mk_ty(ctx, true, &raw("c_longlong")),
+            IULongLong => mk_ty(ctx, true, &raw("c_ulonglong"))
         },
         TFloat(f, _) => match f {
-            FFloat => mk_ty(ctx, true, raw("c_float")),
-            FDouble => mk_ty(ctx, true, raw("c_double"))
+            FFloat => mk_ty(ctx, true, &raw("c_float")),
+            FDouble => mk_ty(ctx, true, &raw("c_double"))
         },
         TPtr(ref t, is_const, _) => {
             let id = cty_to_rs(ctx, &**t);
@@ -1070,39 +1066,32 @@ fn cty_to_rs(ctx: &mut GenCtx, ty: &Type) -> ast::Ty {
         },
         TNamed(ref ti) => {
             let id = rust_type_id(ctx, &ti.borrow().name);
-            mk_ty(ctx, false, vec!(id))
+            mk_ty(ctx, false, &[&id])
         },
         TComp(ref ci) => {
             let mut c = ci.borrow_mut();
             c.name = unnamed_name(ctx, &c.name);
-            mk_ty(ctx, false, vec!(comp_name(c.kind, &c.name)))
+            mk_ty(ctx, false, &[&comp_name(c.kind, &c.name)])
         },
         TEnum(ref ei) => {
             let mut e = ei.borrow_mut();
             e.name = unnamed_name(ctx, &e.name);
-            mk_ty(ctx, false, vec!(enum_name(&e.name)))
+            mk_ty(ctx, false, &[&enum_name(&e.name)])
         }
     }
 }
 
-fn mk_ty(ctx: &GenCtx, global: bool, segments: Vec<String>) -> ast::Ty {
-    let ty = ast::TyKind::Path(
-        None,
-        ast::Path {
-            span: ctx.span,
-            global: global,
-            segments: segments.iter().map(|s| {
-                ast::PathSegment {
-                    identifier: ctx.ext_cx.ident_of(&s[..]),
-                    parameters: ast::PathParameters::AngleBracketed(ast::AngleBracketedParameterData {
-                        lifetimes: Vec::new(),
-                        types: OwnedSlice::empty(),
-                        bindings: OwnedSlice::empty(),
-                    }),
-                }
-            }).collect()
-        },
-    );
+fn mk_ty(ctx: &GenCtx, global: bool, segments: &[&str]) -> ast::Ty {
+    let idents = segments.iter()
+        .map(|seg| ctx.ext_cx.ident_of(seg))
+        .collect();
+    let ty = ast::TyKind::Path(None,
+                               ctx.ext_cx.path_all(ctx.span,
+                                                   global,
+                                                   idents,
+                                                   Vec::new(),
+                                                   Vec::new(),
+                                                   Vec::new()));
 
     ctx.ext_cx.ty(ctx.span, ty).unwrap()
 }
