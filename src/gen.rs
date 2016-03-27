@@ -26,6 +26,10 @@ struct GenCtx<'r> {
     span: Span
 }
 
+fn ref_eq<T>(thing: &T, other: &T) -> bool {
+    (thing as *const T) == (other as *const T)
+}
+
 fn to_intern_str(ctx: &mut GenCtx, s: &str) -> parse::token::InternedString {
     let id = ctx.ext_cx.ident_of(s);
     id.name.as_str()
@@ -239,6 +243,7 @@ pub fn gen_mod(
         }
     }
 
+    gs = remove_redundant_decl(&gs);
     let mut defs = extract_definitions(&mut ctx, &options, &gs);
 
     let vars: Vec<_> = vs.into_iter().map(|v| {
@@ -322,6 +327,32 @@ fn mk_extern(ctx: &mut GenCtx, links: &[(String, LinkType)],
         vis: ast::Visibility::Inherited,
         span: ctx.span
     })
+}
+
+fn remove_redundant_decl(gs: &[Global]) -> Vec<Global> {
+    fn check_decl(a: &Global, ty: &Type) -> bool {
+        match (a, ty) {
+          (&GComp(ref ci1), &TComp(ref ci2)) => {
+              ref_eq(ci1, ci2) && ci1.borrow().name.is_empty()
+          },
+          (&GEnum(ref ei1), &TEnum(ref ei2)) => {
+              ref_eq(ei1, ei2) && ei1.borrow().name.is_empty()
+          },
+          _ => false
+        }
+    }
+
+    // TODO: replace by a Set when Type is Hash and Eq.
+    let typedefs: Vec<Type> = gs.iter().filter_map(|g|
+        match *g {
+            GType(ref ti) => Some(ti.borrow().ty.clone()),
+            _ => None
+        }
+    ).collect();
+
+    gs.iter().filter(|g|
+        typedefs.iter().all(|t| !check_decl(g, t))
+    ).cloned().collect()
 }
 
 fn tag_dup_decl(gs: &[Global]) -> Vec<Global> {
