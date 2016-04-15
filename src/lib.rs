@@ -288,7 +288,13 @@ fn get_clang_dir() -> Option<path::PathBuf>{
                         .file_name()
                         .and_then(|f| f.to_str())
                         .iter()
-                        .any(|&f| f.starts_with("clang")) {
+                        .any(|&f| f.starts_with("clang") || match env::var("TARGET") {
+                            Ok(target) => {
+                                f.starts_with(&format!("{}-clang", target)) ||
+                                f.starts_with(&format!("{}-clang", target.replace("unknown", "pc")))
+                            }
+                            _ => false
+                        }) {
                     if let Some(dir) = real_path.parent() {
                         return Some(dir.to_path_buf())
                     }
