@@ -295,7 +295,13 @@ fn get_clang_dir() -> Option<path::PathBuf>{
                         .iter()
                         .any(|&f| f.starts_with("clang") || match env::var("TARGET") {
                             Ok(target) => {
+                                // Check if clang binary starts with the $TARGET, e.g.
+                                // x86_64-unknown-linux-gnu-clang
                                 f.starts_with(&format!("{}-clang", target)) ||
+                                // Also check the if it starts with the $TARGET after substituting
+                                // "unknown" with "pc" - some distros (Gentoo) use
+                                // x86_64-pc-linux-gnu as their $CHOST/$TARGET rather than
+                                // x86-64-unknown-linux-gnu
                                 f.starts_with(&format!("{}-clang", target.replace("unknown", "pc")))
                             }
                             _ => false
